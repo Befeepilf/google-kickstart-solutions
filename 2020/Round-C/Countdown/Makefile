@@ -1,2 +1,2 @@
 countdown:
-	clang countdown.c -lm
+	clang countdown.c
