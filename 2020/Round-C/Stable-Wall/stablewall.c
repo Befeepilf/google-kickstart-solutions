@@ -1,142 +1,150 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdlib.h>
 
-int main (void)
+
+bool is_brick_stable(char *order, unsigned int order_len, char brick)
 {
-  unsigned int num_tests;
-  fscanf(stdin, "%u\n", &num_tests);
-
-  for (unsigned int i = 0; i < num_tests; i++)
-  {
-    unsigned int r, c;
-    fscanf(stdin, "%u %u\n", &r, &c);
-
-    char bricks[r*c];
-    unsigned int num_bricks = 0;
-
-    char wall[r][c];
-    for (unsigned int j = 0; j < r; j++)
+    for (unsigned int i = 0; i < order_len; i++)
     {
-      for (unsigned int k = 0; k < c; k++)
-      {
-        fscanf(stdin, "%c", &wall[j][k]);
-
-        // if end of line skip newline character
-        if (k == c - 1) fscanf(stdin, "%*c");
-
-        // store every possible type of brick used for wall in bricks[]
-        if (num_bricks < r*c)
+        if (order[i] == brick)
         {
-          bool is_new_brick = true;
-          for (unsigned int l = 0; l < num_bricks; l++)
-          {
-            if (bricks[l] == wall[j][k])
-            {
-              is_new_brick = false;
-              l = num_bricks;
-            }
-          }
-
-          if (is_new_brick)
-          {
-            bricks[num_bricks] = wall[j][k];
-            num_bricks++;
-          }
+            return true;
         }
-      }
     }
 
+    return false;
+}
 
-    char *order = malloc(num_bricks * sizeof(char));
-    unsigned int order_i = 0;
-    unsigned int last_order_i = -1;
+int main(void)
+{
+    unsigned int num_cases;
+    fscanf(stdin, "%u\n", &num_cases);
 
-    while (order_i != num_bricks && last_order_i != order_i)
+    for (unsigned int i = 0; i < num_cases; i++)
     {
-      last_order_i = order_i;
+        unsigned int rows, columns;
+        fscanf(stdin, "%u %u\n", &rows, &columns);
 
-      // for every type of brick
-      for (unsigned int j = 0; j < num_bricks; j++)
-      {
-        //printf("\n--- %i %c ---\n", j, bricks[j]);
+        char wall[rows][columns];
 
-        if (bricks[j] != 0)
+        char bricks[rows * columns]; // holds all different brick types; max num of different bricks is rows*columns
+        unsigned int bricks_count = 0;
+
+        // parse wall from stdin
+        for (unsigned int r = 0; r < rows; r++)
         {
-          bool columns_stable = false;
-
-          // for every column
-          for (unsigned int k = 0; k < c; k++)
-          {
-            bool found_brick = false;
-            bool is_supported = false;
-
-            // for every row
-            for (unsigned int l = 0; l < r; l++)
+            for (unsigned int c = 0; c < columns; c++)
             {
-              //printf("%i %i %c\n", k, l, wall[l][k]);
+                fscanf(stdin, "%c", &wall[r][c]);
 
-              if (!found_brick)
-              {
-                if (wall[l][k] == bricks[j])
+                // if end of line skip newline character
+                if (c == columns - 1) fscanf(stdin, "%*c");
+                
+                bool bricks_exists = false;
+                // check whether this brick type is already in bricks array
+                for (unsigned int b = 0; b < bricks_count; b++)
                 {
-                  //printf("\tfound\n");
-                  found_brick = true;
-                  is_supported = true;
-                }
-                else
-                {
-                  //printf("\tnot found\n");
-                }
-              }
-              else
-              {
-                is_supported = wall[l][k] == bricks[j];
-                if (!is_supported)
-                {
-                  for (unsigned int m = 0; m < order_i; m++)
-                  {
-                    if (wall[l][k] == order[m])
+                    if (bricks[b] == wall[r][c])
                     {
-                      is_supported = true;
-                      m = order_i;
+                        bricks_exists = true;
+                        break;
                     }
-                  }
                 }
 
-                // check next brick
-                if (!is_supported)
+                // if this brick is not yet in bricks array, add it
+                if (!bricks_exists)
                 {
-                  //printf("\tnot supported\n");
-                  l = r;
-                  k = c;
+                    bricks[bricks_count] = wall[r][c];
+                    bricks_count++;
                 }
-                else
+            }
+        }
+
+
+        // check whether wall is stable & determine placement order of bricks
+
+        char placement_order[bricks_count]; // order in which bricks were placed
+        unsigned int placement_order_i = 0;
+
+        bool is_stable = true;
+
+        while (true)
+        {
+            // indicates whether we found the next brick in the placement order in this iteration
+            // if we didn't the wall is unstable & we can abort
+            bool changed = false;
+
+            for (unsigned int b = 0; b < bricks_count; b++)
+            {
+                // if this bricks hasn't been marked as stable yet
+                if (bricks[b] != 0)
                 {
-                  //printf("\tsupported\n");
+                    bool is_stable = true;
+                    unsigned int bricks_height = 0; // number of consecutive stable bricks in a column
+
+                    // start from bottom left of wall & check whether a column contains an unstable series of bricks
+                    for (unsigned int c = 0; c < columns && is_stable; c++)
+                    {
+                        for (unsigned int r = rows; r > 0 && is_stable; r--)
+                        {
+                            if (wall[r - 1][c] == bricks[b] || is_brick_stable(placement_order, placement_order_i, wall[r - 1][c]))
+                            {
+                                // if a series of stable bricks starts without stable bricks below it, abort
+                                if (bricks_height == 0 && r - 1 < rows - 1)
+                                {
+                                    is_stable = false;
+                                }
+                                else
+                                {
+                                    bricks_height++;
+                                }
+                            }
+                            else
+                            {
+                                bricks_height = 0;
+                            }
+                        }
+                    }
+
+                    // if this type of brick can be placed in a stable way (considering bricks that have already been placed), add it as next brick in placemetn_order
+                    if (is_stable)
+                    {
+                        placement_order[placement_order_i] = bricks[b];
+                        placement_order_i++;
+
+                        bricks[b] = 0;
+
+                        changed = true;
+                    }
                 }
-              }
             }
 
-            //printf(is_supported ? "Column is supported\n" : "Column is not supported\n");
+            if (placement_order_i == bricks_count)
+            {
+                break;
+            }
 
-            columns_stable = found_brick ? is_supported : columns_stable;
-          }
-
-          if (columns_stable)
-          {
-            //printf("Added %c\n", bricks[j]);
-            order[order_i] = bricks[j];
-            bricks[j] = 0;
-            order_i++;
-          }
+            if (!changed)
+            {
+                is_stable = false;
+                break;
+            }
         }
-      }
+
+
+        // print result
+        printf("Case #%u: ", i + 1);
+        if (is_stable)
+        {
+            for (unsigned int j = 0; j < placement_order_i; j++)
+            {
+                printf("%c", placement_order[j]);
+            }
+            printf("\n");
+        }
+        else
+        {
+            printf("-1\n");
+        }
     }
-
-
-    printf("Case #%i: %s\n", i + 1, order_i < num_bricks ? "-1" : order);
-
-    free(order);
-  }
 }
